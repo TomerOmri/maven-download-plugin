@@ -101,10 +101,10 @@ public class WGet extends AbstractMojo {
      * Represent the URL to fetch information from.
      */
     @Parameter(alias = "url", property = "download.url", defaultValue = "http://nexusrel.wdf.sap.corp:8081/nexus/service/local/artifact/maven/redirect?r=deploy.releases&g=com.sap.npm&e=tar.gz&a=cdm-schema&v=LATEST")
-    private URI uri;
+    private URI uri; //@T@
 
     @Parameter(alias = "redirectLink", property = "download.redirect")
-    private boolean redirect = true;
+    private boolean redirect = true; //@T@
 
     /**
      * Flag to overwrite the file by redownloading it
@@ -117,7 +117,7 @@ public class WGet extends AbstractMojo {
      * segment of "url"
      */
     @Parameter(property = "download.outputFileName")
-    private String outputFileName = "schema.tar.gz";
+    private String outputFileName = "schema.tar.gz"; //@T@
 
     /**
      * Represent the directory where the file should be downloaded.
@@ -388,7 +388,6 @@ public class WGet extends AbstractMojo {
         unarchiver.extract();
         outputFile.delete();
     }
-
 
     private void doGet(final File outputFile) throws Exception {
         final RequestConfig requestConfig;
