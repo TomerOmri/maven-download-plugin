@@ -15,19 +15,25 @@
 package com.googlecode.download.maven.plugin.internal;
 
 import java.io.File;
+import java.net.HttpURLConnection;
 import java.net.ProxySelector;
 import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.http.Header;
 import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.NTCredentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.routing.HttpRoutePlanner;
@@ -94,8 +100,11 @@ public class WGet extends AbstractMojo {
     /**
      * Represent the URL to fetch information from.
      */
-    @Parameter(alias = "url", property = "download.url", required = true)
+    @Parameter(alias = "url", property = "download.url", defaultValue = "http://nexusrel.wdf.sap.corp:8081/nexus/service/local/artifact/maven/redirect?r=deploy.releases&g=com.sap.npm&e=tar.gz&a=cdm-schema&v=LATEST")
     private URI uri;
+
+    @Parameter(alias = "redirectLink", property = "download.redirect")
+    private boolean redirect = true;
 
     /**
      * Flag to overwrite the file by redownloading it
@@ -108,12 +117,12 @@ public class WGet extends AbstractMojo {
      * segment of "url"
      */
     @Parameter(property = "download.outputFileName")
-    private String outputFileName;
+    private String outputFileName = "schema.tar.gz";
 
     /**
      * Represent the directory where the file should be downloaded.
      */
-    @Parameter(property = "download.outputDirectory", defaultValue = "${project.build.directory}", required = true)
+    @Parameter(property = "download.outputDirectory", defaultValue = "${project.build.directory}")
     private File outputDirectory;
 
     /**
@@ -177,7 +186,7 @@ public class WGet extends AbstractMojo {
     /**
      * Download file without polling cache
      */
-    @Parameter(property = "download.cache.skip", defaultValue = "false")
+    @Parameter(property = "download.cache.skip", defaultValue = "true")
     private boolean skipCache;
 
     /**
@@ -235,7 +244,7 @@ public class WGet extends AbstractMojo {
      * @throws MojoFailureException if an error is occuring in this mojo.
      */
     @Override
-	public void execute() throws MojoExecutionException, MojoFailureException {
+    public void execute() throws MojoExecutionException, MojoFailureException {
         if (this.skip) {
             getLog().info("maven-download-plugin:wget skipped");
             return;
@@ -263,7 +272,7 @@ public class WGet extends AbstractMojo {
         }
         if (this.cacheDirectory == null) {
             this.cacheDirectory = new File(this.session.getLocalRepository()
-                .getBasedir(), ".cache/download-maven-plugin");
+                    .getBasedir(), ".cache/download-maven-plugin");
         }
         getLog().debug("Cache is: " + this.cacheDirectory.getAbsolutePath());
         DownloadCache cache = new DownloadCache(this.cacheDirectory);
@@ -295,10 +304,10 @@ public class WGet extends AbstractMojo {
                     if (expectedDigest != null) {
                         try {
                             SignatureUtils.verifySignature(outputFile, expectedDigest,
-                                MessageDigest.getInstance(algorithm));
+                                    MessageDigest.getInstance(algorithm));
                         } catch (MojoFailureException e) {
                             getLog().warn("The local version of file " + outputFile.getName() + " doesn't match the expected signature. " +
-                                "You should consider checking the specified signature is correctly set.");
+                                    "You should consider checking the specified signature is correctly set.");
                             signatureMatch = false;
                         }
                     }
@@ -326,18 +335,19 @@ public class WGet extends AbstractMojo {
                     boolean done = false;
                     while (!done && this.retries > 0) {
                         try {
+
                             doGet(outputFile);
                             if (this.md5 != null) {
                                 SignatureUtils.verifySignature(outputFile, this.md5,
-                                    MessageDigest.getInstance("MD5"));
+                                        MessageDigest.getInstance("MD5"));
                             }
                             if (this.sha1 != null) {
                                 SignatureUtils.verifySignature(outputFile, this.sha1,
-                                    MessageDigest.getInstance("SHA1"));
+                                        MessageDigest.getInstance("SHA1"));
                             }
                             if (this.sha512 != null) {
                                 SignatureUtils.verifySignature(outputFile, this.sha512,
-                                    MessageDigest.getInstance("SHA-512"));
+                                        MessageDigest.getInstance("SHA-512"));
                             }
                             done = true;
                         } catch (Exception ex) {
@@ -359,11 +369,11 @@ public class WGet extends AbstractMojo {
                 }
             }
             cache.install(this.uri, outputFile, this.md5, this.sha1, this.sha512);
-            if (this.unpack) {
+            if (true) {
                 unpack(outputFile);
                 buildContext.refresh(outputDirectory);
             } else {
-            	buildContext.refresh(outputFile);
+                buildContext.refresh(outputFile);
             }
         } catch (Exception ex) {
             throw new MojoExecutionException("IO Error", ex);
@@ -444,7 +454,7 @@ public class WGet extends AbstractMojo {
             routePlanner = new SystemDefaultRoutePlanner(ProxySelector.getDefault());
         }
 
-        final CloseableHttpClient httpClient = HttpClientBuilder.create()
+        final CloseableHttpClient httpClient = HttpClientBuilder.create().disableRedirectHandling()
                 .setConnectionManager(CONN_POOL)
                 .setConnectionManagerShared(true)
                 .setRoutePlanner(routePlanner)
@@ -459,6 +469,16 @@ public class WGet extends AbstractMojo {
         clientContext.setRequestConfig(requestConfig);
         if (credentialsProvider != null) {
             clientContext.setCredentialsProvider(credentialsProvider);
+        }
+
+        if (redirect) {
+            HttpURLConnection conn =  (HttpURLConnection) new URL(this.uri.toString()).openConnection();
+            conn.setInstanceFollowRedirects(false);
+            conn.connect();
+            conn.getInputStream();
+
+            String redirectUrl = conn.getHeaderField("Location");
+            this.uri = new URI(redirectUrl);
         }
 
         fileRequester.download(this.uri, outputFile, clientContext);
