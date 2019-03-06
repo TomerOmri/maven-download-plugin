@@ -100,11 +100,11 @@ public class WGet extends AbstractMojo {
     /**
      * Represent the URL to fetch information from.
      */
-    @Parameter(alias = "url", property = "download.url", defaultValue = "http://nexusrel.wdf.sap.corp:8081/nexus/service/local/artifact/maven/redirect?r=deploy.releases&g=com.sap.npm&e=tar.gz&a=cdm-schema&v=LATEST")
-    private URI uri; //@T@
+    @Parameter(alias = "url", property = "download.url")
+    private URI uri;
 
     @Parameter(alias = "redirectLink", property = "download.redirect")
-    private boolean redirect = true; //@T@
+    private boolean redirect;
 
     /**
      * Flag to overwrite the file by redownloading it
@@ -116,8 +116,9 @@ public class WGet extends AbstractMojo {
      * Represent the file name to use as output value. If not set, will use last
      * segment of "url"
      */
-    @Parameter(property = "download.outputFileName")
-    private String outputFileName = "schema.tar.gz"; //@T@
+    @Parameter(alias = "outputFileName", property = "download.outputFileName")
+    //private String outputFileName = "schema.tar.gz"; //@T@
+    private String outputFileName;
 
     /**
      * Represent the directory where the file should be downloaded.
